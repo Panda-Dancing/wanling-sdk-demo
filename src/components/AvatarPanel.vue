@@ -17,6 +17,11 @@
       <div class="avatar-status-bar">
         <span class="status-dot" :class="ready ? 'online' : 'offline'"></span>
         <span class="status-text">{{ ready ? '已连接' : '连接中...' }}</span>
+        <span class="state-divider">|</span>
+        <span class="avatar-state" :class="avatarState">
+          <span class="state-icon">{{ stateDisplay.icon }}</span>
+          <span class="state-label">{{ stateDisplay.label }}</span>
+        </span>
       </div>
     </div>
 
@@ -194,7 +199,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { VideoAvatar } from '@wanlingsdk/avatar-sdk'
 
 const props = defineProps({
@@ -203,7 +208,7 @@ const props = defineProps({
   roleId: { type: String, default: 'xiao_ye' }
 })
 
-const emit = defineEmits(['reply', 'dataOut', 'streamState'])
+const emit = defineEmits(['reply', 'dataOut', 'streamState', 'stateChange'])
 
 // DOM refs
 const containerRef = ref(null)
@@ -221,6 +226,22 @@ const isStreaming = ref(false)
 const streamStatus = ref('')
 const asrTempText = ref('')
 const activeTab = ref('chat')
+const avatarState = ref('idle')
+
+// 状态显示配置
+const STATE_CONFIG = {
+  idle: { icon: '⏸️', label: '待机' },
+  listen: { icon: '👂', label: '倾听' },
+  think: { icon: '💡', label: '思考' },
+  speak: { icon: '🗣️', label: '说话' },
+  sleep: { icon: '💤', label: '沉睡' },
+  wake: { icon: '✨', label: '唤醒' },
+  wave: { icon: '👋', label: '打招呼' }
+}
+
+const stateDisplay = computed(() => {
+  return STATE_CONFIG[avatarState.value] || STATE_CONFIG.idle
+})
 
 // 播报相关
 const broadcastText = ref('欢迎来到数字人主动播报演示')
@@ -290,6 +311,14 @@ function connectSocket() {
 function handleDataOut(data) {
   if (!data?.type) return
   switch (data.type) {
+    case 'state_change':
+      const oldState = data?.payload?.old_state || ''
+      const newState = data?.payload?.new_state || ''
+      if (newState && STATE_CONFIG[newState]) {
+        avatarState.value = newState
+        emit('stateChange', { oldState, newState })
+      }
+      break
     case 'sleep_state_change':
       isSleeping.value = data?.payload?.isSleeping === true
       const message = data?.payload?.message || (isSleeping.value ? '虚拟人已沉睡' : '虚拟人已唤醒')
@@ -553,10 +582,79 @@ onUnmounted(() => {
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 8px;
-  background: rgba(0, 0, 0, 0.3);
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
   font-size: 12px;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.state-divider {
+  margin: 0 4px;
+  color: rgba(255, 255, 255, 0.3);
+}
+
+.avatar-state {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 500;
+  transition: all 0.3s ease;
+}
+
+.avatar-state .state-icon {
+  font-size: 12px;
+}
+
+.avatar-state .state-label {
+  text-transform: capitalize;
+}
+
+/* 状态颜色 */
+.avatar-state.idle {
+  background: rgba(100, 116, 139, 0.4);
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.avatar-state.listen {
+  background: rgba(59, 130, 246, 0.4);
+  color: #93c5fd;
+  animation: state-pulse 1.5s ease-in-out infinite;
+}
+
+.avatar-state.think {
+  background: rgba(245, 158, 11, 0.4);
+  color: #fcd34d;
+  animation: state-pulse 1s ease-in-out infinite;
+}
+
+.avatar-state.speak {
+  background: rgba(34, 197, 94, 0.4);
+  color: #86efac;
+  animation: state-pulse 0.8s ease-in-out infinite;
+}
+
+.avatar-state.sleep {
+  background: rgba(139, 92, 246, 0.4);
+  color: #c4b5fd;
+}
+
+.avatar-state.wake {
+  background: rgba(236, 72, 153, 0.4);
+  color: #f9a8d4;
+  animation: state-pulse 0.6s ease-in-out infinite;
+}
+
+.avatar-state.wave {
+  background: rgba(20, 184, 166, 0.4);
+  color: #5eead4;
+}
+
+@keyframes state-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
 }
 
 .status-dot {
