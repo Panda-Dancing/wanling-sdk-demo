@@ -17,6 +17,16 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), 'VITE_')
   const apiBaseUrl = env.VITE_API_BASE_URL
   const useLocalSdk = env.VITE_USE_LOCAL_SDK === 'true'
+  let apiTarget = apiBaseUrl
+  let apiBasePath = ''
+  try {
+    const u = new URL(apiBaseUrl)
+    apiTarget = u.origin
+    apiBasePath = u.pathname.replace(/\/$/, '')
+  } catch {
+    apiTarget = apiBaseUrl
+    apiBasePath = ''
+  }
 
   // 构建 alias 配置
   const alias = {
@@ -42,15 +52,27 @@ export default defineConfig(({ mode }) => {
       proxy: {
         // 代理配置：将 /api 开头的请求转发到后端服务
         '/api': {
-          target: apiBaseUrl,
+          target: apiTarget,
           changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, '/api')
+          secure: false,
+          rewrite: (path) => {
+            const next = apiBasePath
+              ? `${apiBasePath}${path.replace(/^\/api/, '')}`
+              : path.replace(/^\/api/, '')
+            return next || '/'
+          }
         },
-        // WebSocket 代理配置
+        // WebSocket 代理配置：
+        // - 前端访问 /socket.io 时，转发到后端 /api/socket.io
         '/socket.io': {
-          target: apiBaseUrl,
+          target: apiTarget,
           changeOrigin: true,
-          ws: true
+          ws: true,
+          secure: false,
+          rewrite: (path) => path.replace(
+            /^\/socket\.io/,
+            `${apiBasePath ? `${apiBasePath}/socket.io` : '/socket.io'}`
+          )
         }
       }
     }

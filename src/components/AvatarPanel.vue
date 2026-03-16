@@ -203,9 +203,9 @@ import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { VideoAvatar } from '@wanlingsdk/avatar-sdk'
 
 const props = defineProps({
-  apiBaseUrl: { type: String, default: '' },
+  apiBaseUrl: { type: String, default: '/' },
   pageData: { type: Object, default: () => ({}) },
-  roleId: { type: String, default: 'xiao_ma' }
+  roleId: { type: String, default: 'xiao_ye' }
 })
 
 const emit = defineEmits(['reply', 'dataOut', 'streamState', 'stateChange'])
@@ -261,14 +261,24 @@ let avatar = null
 const sessionId = 'demo_' + Date.now() + '_' + Math.random().toString(36).slice(2, 9)
 
 function getBaseUrl() {
-  return props.apiBaseUrl || import.meta.env.VITE_API_BASE_URL || ''
+  const v = String(props.apiBaseUrl || '').trim()
+  if (v && v !== '/') return v
+  return import.meta.env.VITE_API_BASE_URL || v || ''
+}
+
+function normalizeBaseUrl(baseUrl) {
+  const v = String(baseUrl || '').trim()
+  if (!v || v === '/') return window.location.origin
+  if (v.startsWith('/')) return `${window.location.origin}${v}`.replace(/\/$/, '')
+  return v.replace(/\/$/, '')
 }
 
 async function initAvatar() {
   if (!containerRef.value) return
   try {
+    const baseUrl = normalizeBaseUrl(getBaseUrl())
     avatar = new VideoAvatar({
-      apiBaseUrl: getBaseUrl(),
+      apiBaseUrl: baseUrl,
       characterId: props.roleId,
       container: containerRef.value,
       useLLMStream: true,
@@ -287,10 +297,9 @@ async function initAvatar() {
 
 function connectSocket() {
   if (!avatar) return
-  // 使用相对路径，让 WebSocket 走 Vite 代理，避免 HTTPS 页面的 Mixed Content 问题
-  // Vite 代理会将请求转发到实际的后端服务器
+  const socketUrl = normalizeBaseUrl(getBaseUrl())
   avatar.connectTtsaSocket({
-    url: '/',  // 相对路径，使用当前页面的域名和协议（HTTPS → WSS）
+    url: socketUrl,
     room: sessionId,
     onReady: () => {
       ready.value = true
