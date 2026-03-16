@@ -205,7 +205,7 @@ import { VideoAvatar } from '@wanlingsdk/avatar-sdk'
 const props = defineProps({
   apiBaseUrl: { type: String, default: '' },
   pageData: { type: Object, default: () => ({}) },
-  roleId: { type: String, default: 'xiao_ye' }
+  roleId: { type: String, default: 'xiao_ma' }
 })
 
 const emit = defineEmits(['reply', 'dataOut', 'streamState', 'stateChange'])
@@ -287,8 +287,10 @@ async function initAvatar() {
 
 function connectSocket() {
   if (!avatar) return
+  // 使用相对路径，让 WebSocket 走 Vite 代理，避免 HTTPS 页面的 Mixed Content 问题
+  // Vite 代理会将请求转发到实际的后端服务器
   avatar.connectTtsaSocket({
-    url: getBaseUrl(),
+    url: '/',  // 相对路径，使用当前页面的域名和协议（HTTPS → WSS）
     room: sessionId,
     onReady: () => {
       ready.value = true

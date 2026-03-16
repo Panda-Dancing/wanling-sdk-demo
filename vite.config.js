@@ -1,5 +1,6 @@
 import { defineConfig, loadEnv } from 'vite'
 import vue from '@vitejs/plugin-vue'
+import basicSsl from '@vitejs/plugin-basic-ssl'
 import { resolve } from 'path'
 
 /**
@@ -12,8 +13,8 @@ import { resolve } from 'path'
  * - 支持本地 SDK 调试模式（npm run local）
  */
 export default defineConfig(({ mode }) => {
-  // 加载环境变量
-  const env = loadEnv(mode, process.cwd(), '')
+  // 加载环境变量（只加载以 VITE_ 开头的变量）
+  const env = loadEnv(mode, process.cwd(), 'VITE_')
   const apiBaseUrl = env.VITE_API_BASE_URL
   const useLocalSdk = env.VITE_USE_LOCAL_SDK === 'true'
 
@@ -30,10 +31,13 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [vue()],
+    plugins: [vue(), basicSsl()],
     resolve: { alias },
     server: {
-      host: '127.0.0.1',
+      // 启用 HTTPS 以支持 WebCodecs API 在非 localhost 地址使用
+      // WebCodecs 需要安全上下文（HTTPS 或 localhost）
+      https: true,
+      host: true,
       port: 5173,
       proxy: {
         // 代理配置：将 /api 开头的请求转发到后端服务
