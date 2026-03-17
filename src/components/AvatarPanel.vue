@@ -82,13 +82,13 @@
               v-model="inputText"
               type="text"
               class="text-input"
-              placeholder="输入消息..."
+              :placeholder="voiceResponseMode === 'asr_only' ? 'asr_only 模式下文本对话已禁用' : '输入消息...'"
               @keydown.enter="send"
-              :disabled="loading || !isVisible"
+              :disabled="loading || !isVisible || voiceResponseMode === 'asr_only'"
             />
             <button 
               class="send-btn" 
-              :disabled="loading || !inputText.trim() || !isVisible" 
+              :disabled="loading || !inputText.trim() || !isVisible || voiceResponseMode === 'asr_only'" 
               @click="send"
             >
               发送
@@ -106,6 +106,17 @@
               {{ isStreaming ? '正在录音，请说话...' : '点击下方按钮开始实时语音对话' }}
             </p>
             <p v-if="streamStatus" class="voice-detail">{{ streamStatus }}</p>
+          </div>
+          <div class="voice-mode-card">
+            <p class="voice-mode-title">回复模式</p>
+            <label class="voice-mode-option">
+              <input v-model="voiceResponseMode" type="radio" value="auto_reply" :disabled="isStreaming" />
+              <span>自动回复</span>
+            </label>
+            <label class="voice-mode-option">
+              <input v-model="voiceResponseMode" type="radio" value="asr_only" :disabled="isStreaming" />
+              <span>仅返回 ASR 文本</span>
+            </label>
           </div>
           <div class="voice-actions">
             <button
@@ -125,7 +136,8 @@
             </button>
           </div>
           <div class="voice-note">
-            <p>💡 语音对话时，SDK 会自动进行语音识别并发送给虚拟人回复</p>
+            <p v-if="voiceResponseMode === 'auto_reply'">💡 语音对话时，ASR 最终文本会自动触发虚拟人回复</p>
+            <p v-else>💡 当前模式只返回 ASR 文本，不触发 LLM、TTS 和虚拟人播报</p>
           </div>
         </div>
 
@@ -255,6 +267,7 @@ const broadcastState = ref({
   queue: []
 })
 const lastBroadcastEvent = ref('暂无事件')
+const voiceResponseMode = ref('auto_reply')
 
 // SDK 实例
 let avatar = null
@@ -282,6 +295,7 @@ async function initAvatar() {
       characterId: props.roleId,
       container: containerRef.value,
       useLLMStream: true,
+      voiceResponseMode: voiceResponseMode.value,
       debug: false
     })
     await avatar.init()
@@ -421,6 +435,7 @@ function handleError(err) {
 
 function send() {
   const text = (inputText.value || '').trim()
+  if (voiceResponseMode.value === 'asr_only') return
   if (!text || loading.value || !avatar || !isVisible.value) return
   messages.value.push({ role: 'user', text })
   inputText.value = ''
@@ -465,7 +480,10 @@ function clearQueuedBroadcasts() {
 async function startStream() {
   if (!avatar || !isVisible.value) return
   try {
-    await avatar.startVoiceStream()
+    asrTempText.value = ''
+    await avatar.startVoiceStream({
+      voiceResponseMode: voiceResponseMode.value
+    })
     isStreaming.value = true
     emit('streamState', { streaming: true, status: 'connecting' })
   } catch (error) {
@@ -533,6 +551,17 @@ watch(() => props.pageData, (data) => {
     avatar.setPageData(data)
   }
 }, { deep: true })
+
+watch(voiceResponseMode, (mode) => {
+  if (mode === 'asr_only') {
+    inputText.value = ''
+    loading.value = false
+    replyText.value = ''
+  }
+  if (avatar && typeof avatar.setVoiceResponseMode === 'function') {
+    avatar.setVoiceResponseMode(mode)
+  }
+})
 
 onMounted(() => {
   initAvatar()
@@ -916,6 +945,33 @@ onUnmounted(() => {
   font-size: 13px;
   color: rgba(255, 255, 255, 0.5);
   margin: 8px 0 0;
+}
+
+.voice-mode-card {
+  width: 100%;
+  max-width: 320px;
+  padding: 14px 16px;
+  border-radius: 12px;
+  background: rgba(10, 20, 35, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.voice-mode-title {
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.65);
+}
+
+.voice-mode-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, 0.92);
+  font-size: 14px;
+}
+
+.voice-mode-option + .voice-mode-option {
+  margin-top: 10px;
 }
 
 .voice-actions {

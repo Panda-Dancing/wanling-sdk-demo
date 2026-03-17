@@ -168,11 +168,42 @@ avatar.connectTtsaSocket({
 avatar.sendTextViaSocket('你好')
 
 // 启动实时语音对话
-await avatar.startVoiceStream()
+await avatar.startVoiceStream({
+  voiceResponseMode: 'auto_reply' // 自动回复模式，也就是 asr_reply
+})
 
 // 停止实时语音对话
 avatar.stopVoiceStream()
 ```
+
+#### 5.1 实时语音回复模式
+
+Demo 和 SDK 当前支持两种实时语音模式：
+
+| 模式值 | 说明 |
+|------|------|
+| `auto_reply` | 自动回复模式，对应需求里的 `asr_reply`。ASR 最终文本会继续触发 LLM、TTS 和数字人播报 |
+| `asr_only` | 仅返回 ASR 文本。服务端只回传识别结果，不生成数字人回复 |
+
+使用方式：
+
+```javascript
+// 1. 自动回复模式（asr_reply）
+await avatar.startVoiceStream({
+  voiceResponseMode: 'auto_reply'
+})
+
+// 2. 仅返回 ASR 文本
+await avatar.startVoiceStream({
+  voiceResponseMode: 'asr_only'
+})
+```
+
+在 Demo 页面中的行为：
+
+- `auto_reply`：可以发送文本，也可以开启实时语音；语音识别完成后虚拟人会自动回复
+- `asr_only`：实时语音只显示识别出的 ASR 文本；文本输入框和发送按钮会被禁用
+- `asr_only`：主动播报功能仍然可用，不受影响
 
 #### 6. 隐藏 / 展示数字人
 
