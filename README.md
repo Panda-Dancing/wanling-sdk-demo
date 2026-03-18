@@ -98,11 +98,18 @@ await avatar.init()
 avatar.connectTtsaSocket({
   url: getBaseUrl(),
   room: sessionId,             // 会话 ID
+  ttsSpeed: 200,               // TTS 语速（-500 到 500，可选，不传则使用角色配置默认值）
   onReady: () => { /* 连接成功 */ },
   onReplyText: (data) => { /* 收到文本回复 */ },
   onDataOut: (data) => { /* 收到其他数据（状态、ASR等） */ }
 })
 ```
+
+**ttsSpeed 参数说明：**
+
+| 参数 | 类型 | 范围 | 说明 |
+|------|------|------|------|
+| `ttsSpeed` | number | -500 到 500 | TTS 语速，0 为正常速度，负值减速，正值加速。不传则使用后端角色配置默认值 |
 
 #### 4. 监听状态变更和其他事件
 
@@ -401,6 +408,7 @@ case 'asr_transcription':
     ref="avatarRef"
     :api-base-url="apiBaseUrl"
     :page-data="{ selectedCity }"
+    :tts-speed="200"
     @reply="onReply"
   />
 </template>
@@ -414,6 +422,15 @@ function onSelectCity(cityName) {
 }
 </script>
 ```
+
+**AvatarPanel 组件 Props：**
+
+| Prop | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| `apiBaseUrl` | string | '/' | 后端 API 地址 |
+| `pageData` | object | {} | 页面上下文数据 |
+| `roleId` | string | 'xiao_ye' | 角色 ID |
+| `ttsSpeed` | number | 0 | TTS 语速（-500 到 500） |
 
 父组件也可以通过 `ref` 直接控制隐藏 / 展示：
 

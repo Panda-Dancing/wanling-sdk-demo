@@ -217,7 +217,8 @@ import { VideoAvatar } from '@wanlingsdk/avatar-sdk'
 const props = defineProps({
   apiBaseUrl: { type: String, default: '/' },
   pageData: { type: Object, default: () => ({}) },
-  roleId: { type: String, default: 'xiao_ye' }
+  roleId: { type: String, default: 'xiao_ye' },
+  ttsSpeed: { type: Number, default: 0 }  // TTS 语速（-500 到 500）
 })
 
 const emit = defineEmits(['reply', 'dataOut', 'streamState', 'stateChange'])
@@ -315,6 +316,7 @@ function connectSocket() {
   avatar.connectTtsaSocket({
     url: socketUrl,
     room: sessionId,
+    ttsSpeed: props.ttsSpeed,  // TTS 语速（-500 到 500）
     onReady: () => {
       ready.value = true
       syncBroadcastState()
