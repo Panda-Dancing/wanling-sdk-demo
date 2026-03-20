@@ -402,6 +402,14 @@ function handleDataOut(data) {
     case 'broadcast_queue_change':
       syncBroadcastState()
       break
+    case 'message_ignored':
+      // 消息被忽略（如沉睡状态），重置 loading 并显示提示
+      loading.value = false
+      replyText.value = ''
+      const ignoredMsg = data?.payload?.message || '消息已被忽略'
+      messages.value.push({ role: 'assistant', text: ignoredMsg })
+      scrollToBottom()
+      break
   }
 }
 
