@@ -41,12 +41,12 @@ export default defineConfig(({ mode }) => {
   }
 
   return {
-    plugins: [vue(), basicSsl()],
+    plugins: [vue()],
     resolve: { alias },
     server: {
-      // 启用 HTTPS 以支持 WebCodecs API 在非 localhost 地址使用
-      // WebCodecs 需要安全上下文（HTTPS 或 localhost）
-      https: true,
+      // localhost 本身是安全上下文，HTTP 也能使用 WebCodecs
+      // 使用 HTTP 可避免混合内容问题（口型生成服务返回 HTTP URL）
+      https: false,
       host: true,
       port: 5173,
       proxy: {

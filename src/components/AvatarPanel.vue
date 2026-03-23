@@ -82,7 +82,7 @@
               v-model="inputText"
               type="text"
               class="text-input"
-              :placeholder="voiceResponseMode === 'asr_only' ? 'asr_only 模式下文本对话已禁用' : '输入消息...'"
+              :placeholder="isSleeping ? '虚拟人正在休息，说唤醒词唤醒...' : (voiceResponseMode === 'asr_only' ? 'asr_only 模式下文本对话已禁用' : '输入消息...')"
               @keydown.enter="send"
               :disabled="loading || !isVisible || voiceResponseMode === 'asr_only'"
             />
@@ -348,10 +348,12 @@ function handleDataOut(data) {
       break
     case 'sleep_state_change':
       isSleeping.value = data?.payload?.isSleeping === true
-      const message = data?.payload?.message || (isSleeping.value ? '虚拟人已沉睡' : '虚拟人已唤醒')
-      messages.value.push({ role: 'assistant', text: message })
-      loading.value = false
+      const sleepMessage = data?.payload?.message || (isSleeping.value ? '虚拟人已沉睡' : '虚拟人已唤醒')
       replyText.value = ''
+      // 无论进入沉睡还是唤醒，都显示对应消息并重置 loading
+      // 因为沉睡/唤醒使用的是 direct_speech_service，不会发送 reply_text 事件
+      loading.value = false
+      messages.value.push({ role: 'assistant', text: sleepMessage })
       scrollToBottom()
       break
     case 'asr_status':
@@ -403,7 +405,7 @@ function handleDataOut(data) {
       syncBroadcastState()
       break
     case 'message_ignored':
-      // 消息被忽略（如沉睡状态），重置 loading 并显示提示
+      // 消息被忽略（如沉睡状态），重置 loading 并显示提示，但保留用户消息
       loading.value = false
       replyText.value = ''
       const ignoredMsg = data?.payload?.message || '消息已被忽略'
@@ -446,10 +448,15 @@ function handleError(err) {
 function send() {
   const text = (inputText.value || '').trim()
   if (voiceResponseMode.value === 'asr_only') return
+  // 沉睡状态下也允许发送消息（用于唤醒词唤醒虚拟人）
   if (!text || loading.value || !avatar || !isVisible.value) return
   messages.value.push({ role: 'user', text })
   inputText.value = ''
-  loading.value = true
+  // 沉睡状态下不设置 loading，避免显示"思考中..."并禁用输入框
+  // 唤醒成功后服务端会正常返回回复，不是唤醒词则返回 message_ignored
+  if (!isSleeping.value) {
+    loading.value = true
+  }
   replyText.value = ''
   avatar.sendTextViaSocket(text)
   scrollToBottom()
