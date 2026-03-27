@@ -298,7 +298,6 @@ async function initAvatar() {
       useLLMStream: true,
       voiceResponseMode: voiceResponseMode.value,
       debug: false,
-      chromaKey: true,
     })
     await avatar.init()
     if (props.pageData && Object.keys(props.pageData).length > 0) {
