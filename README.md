@@ -385,19 +385,33 @@ avatar.sendExternalChatChunk('这是完整的文案内容', true)
 // 虚拟人自动: THINK → TTS → SPEAK → IDLE
 ```
 
-**场景 2：流式推送（模拟 LLM 生成）**
+**场景 2：流式推送（对接 LLM）**
+
+SDK 接口 `sendExternalChatChunk(text, isFinal)` 兼容 OpenAI 标准流式格式：
 
 ```javascript
 // 1. 开始外部对话 → 虚拟人进入思考状态
 avatar.startExternalChat()
 
-// 2. 调用自己的 LLM（流式）
-const stream = await myLLM.chat('用户问题')
+// 2. 调用 OpenAI 兼容的 LLM（流式）
+const stream = await openai.chat.completions.create({
+  model: 'gpt-4',
+  messages: [{ role: 'user', content: '用户问题' }],
+  stream: true
+})
+
 for await (const chunk of stream) {
-    avatar.sendExternalChatChunk(chunk.text, chunk.done)
+  const content = chunk.choices[0].delta.content || ''
+  const isFinal = chunk.choices[0].finish_reason === 'stop'
+  
+  if (content) {
+    avatar.sendExternalChatChunk(content, isFinal)
+  }
 }
 // 虚拟人自动: THINK → TTS → SPEAK → IDLE
 ```
+
+> **兼容性说明**：DeepSeek、智谱 GLM、通义千问、百川等国内 LLM 均支持 OpenAI 格式，写法相同。
 
 **取消外部对话：**
 
