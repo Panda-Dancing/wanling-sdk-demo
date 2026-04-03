@@ -12,6 +12,38 @@
 import { createApp } from 'vue'
 import App from './App.vue'
 
+function installTimestampedConsole() {
+  if (typeof window === 'undefined') return
+  if (window.__WANLING_CONSOLE_TS_PATCHED__) return
+
+  const pageStart = performance.now()
+  const methods = ['log', 'info', 'warn', 'error', 'debug']
+
+  const formatNow = () => {
+    const now = new Date()
+    const hh = String(now.getHours()).padStart(2, '0')
+    const mm = String(now.getMinutes()).padStart(2, '0')
+    const ss = String(now.getSeconds()).padStart(2, '0')
+    const ms = String(now.getMilliseconds()).padStart(3, '0')
+    return `${hh}:${mm}:${ss}.${ms}`
+  }
+
+  methods.forEach((method) => {
+    const original = console[method]
+    if (typeof original !== 'function') return
+
+    console[method] = function patchedConsoleMethod(...args) {
+      const elapsedMs = Math.round(performance.now() - pageStart)
+      const prefix = `[${formatNow()} +${elapsedMs}ms]`
+      original.call(console, prefix, ...args)
+    }
+  })
+
+  window.__WANLING_CONSOLE_TS_PATCHED__ = true
+}
+
+installTimestampedConsole()
+
 // 创建 Vue 应用实例
 const app = createApp(App)
 

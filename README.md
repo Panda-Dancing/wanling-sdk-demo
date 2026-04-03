@@ -1,4 +1,4 @@
-# XHuman Video Avatar SDK - 前端接入示例
+# WanLing Avatar SDK - 前端接入示例
 
 这是一个简化版的 SDK 接入示例项目，基于 Vue 3 + Vite 构建，演示了如何将 XHuman Video Avatar SDK 集成到您的 Web 应用中。
 
@@ -347,6 +347,82 @@ onDataOut: (data) => {
 }
 ```
 
+#### 9. 外部对话模式
+
+外部对话模式允许用户自行管理 LLM 对话过程，通过 SDK 流式推送文本到后端。与直接播报不同，外部对话会让虚拟人先进入"思考"状态（展示思考动画），再进行 TTS 播报，模拟完整的对话体验。
+
+**与主动播报的区别：**
+
+| 特性 | 主动播报 (Broadcast) | 外部对话 (External Chat) |
+|-----|---------------------|------------------------|
+| 状态流转 | 直接进入播报 | THINK → TTS → SPEAK → IDLE（显示思考过程） |
+| 文本推送 | 一次性发送完整文本 | 支持流式逐句推送 |
+| 适用场景 | 预设文案播报 | 用户自行调用 LLM 生成文案 |
+| 队列管理 | 支持优先级队列 | 遵循交互策略 |
+
+**SDK API：**
+
+```javascript
+// 开始外部对话，虚拟人进入思考状态
+avatar.startExternalChat()
+
+// 推送文本片段，isFinal=true 时触发 TTS
+avatar.sendExternalChatChunk(text, isFinal)
+
+// 取消外部对话
+avatar.cancelExternalChat()
+
+// 只读属性，外部对话是否活跃
+avatar.isExternalChatActive
+```
+
+**场景 1：一次性推送完整文案（带思考动画）**
+
+```javascript
+// 虚拟人先展示思考状态，再播报
+avatar.startExternalChat()
+avatar.sendExternalChatChunk('这是完整的文案内容', true)
+// 虚拟人自动: THINK → TTS → SPEAK → IDLE
+```
+
+**场景 2：流式推送（模拟 LLM 生成）**
+
+```javascript
+// 1. 开始外部对话 → 虚拟人进入思考状态
+avatar.startExternalChat()
+
+// 2. 调用自己的 LLM（流式）
+const stream = await myLLM.chat('用户问题')
+for await (const chunk of stream) {
+    avatar.sendExternalChatChunk(chunk.text, chunk.done)
+}
+// 虚拟人自动: THINK → TTS → SPEAK → IDLE
+```
+
+**取消外部对话：**
+
+```javascript
+avatar.cancelExternalChat()
+```
+
+**Demo 集成 UI：**
+
+Demo 中播报面板已集成外部对话演示区域：
+
+| 控件 | 说明 |
+|------|------|
+| **文本输入框** | 输入要推送的文本内容 |
+| **流式推送模式** | 勾选后模拟逐句推送效果 |
+| **开始外部对话** | 开始外部对话并推送文本 |
+| **取消对话** | 取消当前外部对话 |
+
+**父组件外部触发：**
+
+```javascript
+// 父组件中通过 ref 调用
+avatarRef.value?.startAndSendExternalChat?.()
+```
+
 ### ASR 语音识别文本显示实现
 
 本 Demo 演示了如何将 ASR 识别的文本显示在聊天面板中：
@@ -464,6 +540,7 @@ Demo 中提供了两种入口：
 - **实时语音**：启动/停止 ASR 语音识别
 - **展示控制**：隐藏/展示数字人并同步后端交互开关
 - **主动播报**：发起播报、取消当前播报、清空等待队列、展示播报队列状态
+- **外部对话**：开始外部对话、流式推送文本、取消外部对话（模拟用户自行调用 LLM）
 - **状态管理**：处理沉睡状态、ASR 状态等
 - **页面数据**：setPageData/getPageData 的使用
 
@@ -483,6 +560,7 @@ Demo 中提供了两种入口：
 - 如何通过 ref 调用子组件方法
 - 如何在父组件中外部控制数字人的隐藏/展示
 - 如何在父组件中外部触发主动播报
+- 如何在父组件中外部触发外部对话
 - 页面数据如何传递给 SDK
 
 

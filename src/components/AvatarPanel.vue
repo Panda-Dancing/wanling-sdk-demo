@@ -200,6 +200,50 @@
             </div>
           </div>
 
+          <!-- 外部对话模式 -->
+          <div class="section-divider">外部对话模式（带思考状态）</div>
+
+          <!-- 外部对话状态 -->
+          <div class="broadcast-status-bar" v-if="externalChatActive">
+            <span class="status-dot active"></span>
+            <span>外部对话进行中</span>
+          </div>
+
+          <!-- 外部对话文本输入 -->
+          <textarea 
+            v-model="externalChatText"
+            placeholder="输入要通过外部对话推送的文本...&#10;虚拟人会先进入思考状态，再进行TTS播报"
+            rows="5"
+            class="broadcast-textarea external-chat-textarea"
+            :disabled="!ready || !isVisible"
+          ></textarea>
+
+          <!-- 模式选择 -->
+          <div class="broadcast-options">
+            <label class="option-item checkbox">
+              <input type="checkbox" v-model="externalChatStreamMode">
+              <span>模拟流式推送（逐句推送）</span>
+            </label>
+          </div>
+
+          <!-- 外部对话操作按钮 -->
+          <div class="broadcast-buttons">
+            <button 
+              class="bc-btn primary" 
+              @click="startAndSendExternalChat"
+              :disabled="!externalChatText.trim() || externalChatActive || !ready || !isVisible"
+            >
+              🚀 开始外部对话
+            </button>
+            <button 
+              class="bc-btn danger" 
+              @click="cancelExternalChat"
+              :disabled="!externalChatActive"
+            >
+              取消对话
+            </button>
+          </div>
+
           <div class="broadcast-log">
             <div class="log-title">事件日志</div>
             <div class="log-content">{{ lastBroadcastEvent }}</div>
@@ -269,6 +313,11 @@ const broadcastState = ref({
 })
 const lastBroadcastEvent = ref('暂无事件')
 const voiceResponseMode = ref('auto_reply')
+
+// 外部对话相关状态
+const externalChatText = ref('这是一段通过外部对话模式推送的文本。虚拟人会先进入思考状态，展示自然的思考动画，然后再进行语音播报。')
+const externalChatActive = ref(false)
+const externalChatStreamMode = ref(false)
 
 // SDK 实例
 let avatar = null
@@ -494,6 +543,55 @@ function clearQueuedBroadcasts() {
   avatar.clearBroadcastQueue()
 }
 
+// ====== 外部对话方法 ======
+
+/**
+ * 开始外部对话并推送文本
+ * 支持两种模式：一次性推送 和 模拟流式推送
+ */
+async function startAndSendExternalChat() {
+  const text = externalChatText.value.trim()
+  if (!text || !avatar || !isVisible.value) return
+  
+  // 1. 开始外部对话 → 虚拟人进入思考状态
+  avatar.startExternalChat()
+  externalChatActive.value = true
+  lastBroadcastEvent.value = '✨ 外部对话已启动，虚拟人进入思考状态'
+  
+  if (externalChatStreamMode.value) {
+    // 模拟流式推送：按句子分割，逐句推送
+    const sentences = text.match(/[^。！？.!?\n]+[。！？.!?\n]?/g) || [text]
+    for (let i = 0; i < sentences.length; i++) {
+      const chunk = sentences[i].trim()
+      if (!chunk) continue
+      const isFinal = (i === sentences.length - 1)
+      
+      // 模拟延迟（模拟 LLM 生成速度）
+      if (i > 0) {
+        await new Promise(r => setTimeout(r, 500))
+      }
+      
+      avatar.sendExternalChatChunk(chunk, isFinal)
+      lastBroadcastEvent.value = isFinal 
+        ? `📤 流式推送完成 (共 ${sentences.length} 句)`
+        : `📤 推送第 ${i + 1}/${sentences.length} 句: ${chunk.slice(0, 20)}...`
+    }
+  } else {
+    // 一次性推送完整文本
+    avatar.sendExternalChatChunk(text, true)
+    lastBroadcastEvent.value = `📤 已推送完整文本 (${text.length} 字)`
+  }
+  
+  externalChatActive.value = false
+}
+
+function cancelExternalChat() {
+  if (!avatar) return
+  avatar.cancelExternalChat()
+  externalChatActive.value = false
+  lastBroadcastEvent.value = '❌ 外部对话已取消'
+}
+
 async function startStream() {
   if (!avatar || !isVisible.value) return
   try {
@@ -560,7 +658,9 @@ defineExpose({
   sendBroadcast,
   cancelActiveBroadcast,
   clearQueuedBroadcasts,
-  getBroadcastState: () => broadcastState.value
+  getBroadcastState: () => broadcastState.value,
+  startAndSendExternalChat,
+  cancelExternalChat,
 })
 
 watch(() => props.pageData, (data) => {
@@ -1036,6 +1136,17 @@ onUnmounted(() => {
 .broadcast-panel {
   padding: 16px;
   gap: 16px;
+  overflow-y: auto;
+}
+
+.section-divider {
+  margin: 16px 0 12px;
+  padding: 6px 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.6);
+  border-top: 1px solid rgba(59, 123, 196, 0.3);
+  padding-top: 12px;
 }
 
 .broadcast-status-bar {
@@ -1093,6 +1204,11 @@ onUnmounted(() => {
 
 .broadcast-textarea:focus {
   border-color: rgba(102, 126, 234, 0.8);
+}
+
+.external-chat-textarea {
+  height: 120px !important;
+  min-height: 120px;
 }
 
 .broadcast-options {
