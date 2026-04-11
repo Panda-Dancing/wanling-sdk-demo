@@ -212,6 +212,40 @@ await avatar.startVoiceStream({
 - `asr_only`：实时语音只显示识别出的 ASR 文本；文本输入框和发送按钮会被禁用
 - `asr_only`：主动播报功能仍然可用，不受影响
 
+#### 5.2 手势提示参数 `gestureHint`
+
+Demo 中新增了“手势提示”控制，对应 SDK/接口中的 `gestureHint` 参数，用于提示后端优先选择哪一侧的 `speak` 手势变体。
+
+| 取值 | Demo 按钮文案 | 说明 |
+|------|---------------|------|
+| `'left_hand'` | 左侧手势 | 优先命中带 `gesture_tags: [left_hand]` 的播报动作 |
+| `'right_hand'` | 右侧手势 | 优先命中带 `gesture_tags: [right_hand]` 的播报动作 |
+| `null` | 清除 | 清除当前提示，恢复后端默认选择 |
+
+**Demo 中的生效方式：**
+
+- 文本发送时，Demo 会按次透传：`avatar.sendTextViaSocket(text, { gestureHint: gestureHint.value })`
+- 建立连接后，以及用户切换“左侧 / 右侧 / 清除”按钮时，Demo 会同步调用：`avatar.setGestureHint(hint)`
+- 因此文本对话既支持“本次请求指定”，也会和当前会话级提示保持一致
+- 实时语音、主动播报、外部对话这类连续交互，默认沿用当前 `setGestureHint()` 设置
+
+```javascript
+// 单次文本发送时指定
+avatar.sendTextViaSocket('你好', {
+  gestureHint: 'right_hand'
+})
+
+// 设置当前会话级手势提示
+avatar.setGestureHint('left_hand')
+avatar.setGestureHint('right_hand')
+avatar.setGestureHint(null)
+```
+
+**使用建议：**
+
+- 需要临时指定一次左右手势时，在单次发送参数里传 `gestureHint`
+- 需要让后续语音、播报或外部对话持续使用同一侧手势时，先调用 `setGestureHint(hint)`
+
 #### 6. 隐藏 / 展示数字人
 
 SDK 现在提供会话级的展示开关。隐藏后：
