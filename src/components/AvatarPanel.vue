@@ -77,6 +77,36 @@
               {{ loading && !replyText ? '思考中...' : replyText }}
             </div>
           </div>
+          <div class="gesture-hint-bar">
+            <span class="gesture-hint-label">手势提示</span>
+            <div class="gesture-hint-actions">
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'left_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('left_hand')"
+              >
+                左侧
+              </button>
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'right_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('right_hand')"
+              >
+                右侧
+              </button>
+              <button
+                class="gesture-hint-btn clear"
+                :class="{ active: gestureHint === null }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint(null)"
+              >
+                清除
+              </button>
+            </div>
+            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
+          </div>
           <div class="input-area">
             <input
               v-model="inputText"
@@ -117,6 +147,36 @@
               <input v-model="voiceResponseMode" type="radio" value="asr_only" :disabled="isStreaming" />
               <span>仅返回 ASR 文本</span>
             </label>
+          </div>
+          <div class="gesture-hint-bar">
+            <span class="gesture-hint-label">手势提示</span>
+            <div class="gesture-hint-actions">
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'left_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('left_hand')"
+              >
+                左侧
+              </button>
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'right_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('right_hand')"
+              >
+                右侧
+              </button>
+              <button
+                class="gesture-hint-btn clear"
+                :class="{ active: gestureHint === null }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint(null)"
+              >
+                清除
+              </button>
+            </div>
+            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
           <div class="voice-actions">
             <button
@@ -175,6 +235,37 @@
               </label>
             </div>
 
+            <div class="gesture-hint-bar">
+              <span class="gesture-hint-label">手势提示</span>
+              <div class="gesture-hint-actions">
+                <button
+                  class="gesture-hint-btn"
+                  :class="{ active: gestureHint === 'left_hand' }"
+                  :disabled="!ready || !isVisible"
+                  @click="applyGestureHint('left_hand')"
+                >
+                  左侧
+                </button>
+                <button
+                  class="gesture-hint-btn"
+                  :class="{ active: gestureHint === 'right_hand' }"
+                  :disabled="!ready || !isVisible"
+                  @click="applyGestureHint('right_hand')"
+                >
+                  右侧
+                </button>
+                <button
+                  class="gesture-hint-btn clear"
+                  :class="{ active: gestureHint === null }"
+                  :disabled="!ready || !isVisible"
+                  @click="applyGestureHint(null)"
+                >
+                  清除
+                </button>
+              </div>
+              <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
+            </div>
+
             <div class="broadcast-buttons">
               <button
                 class="bc-btn primary"
@@ -224,6 +315,37 @@
               <input type="checkbox" v-model="externalChatStreamMode">
               <span>模拟流式推送（逐句推送）</span>
             </label>
+          </div>
+
+          <div class="gesture-hint-bar">
+            <span class="gesture-hint-label">手势提示</span>
+            <div class="gesture-hint-actions">
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'left_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('left_hand')"
+              >
+                左侧
+              </button>
+              <button
+                class="gesture-hint-btn"
+                :class="{ active: gestureHint === 'right_hand' }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint('right_hand')"
+              >
+                右侧
+              </button>
+              <button
+                class="gesture-hint-btn clear"
+                :class="{ active: gestureHint === null }"
+                :disabled="!ready || !isVisible"
+                @click="applyGestureHint(null)"
+              >
+                清除
+              </button>
+            </div>
+            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
 
           <!-- 外部对话操作按钮 -->
@@ -299,6 +421,11 @@ const STATE_CONFIG = {
 const stateDisplay = computed(() => {
   return STATE_CONFIG[avatarState.value] || STATE_CONFIG.idle
 })
+const gestureHintText = computed(() => {
+  if (gestureHint.value === 'left_hand') return '左侧'
+  if (gestureHint.value === 'right_hand') return '右侧'
+  return '无'
+})
 
 // 播报相关
 const broadcastText = ref('欢迎来到数字人主动播报演示')
@@ -313,6 +440,7 @@ const broadcastState = ref({
 })
 const lastBroadcastEvent = ref('暂无事件')
 const voiceResponseMode = ref('auto_reply')
+const gestureHint = ref(null)
 
 // 外部对话相关状态
 const externalChatText = ref('这是一段通过外部对话模式推送的文本。虚拟人会先进入思考状态，展示自然的思考动画，然后再进行语音播报。')
@@ -368,6 +496,9 @@ function connectSocket() {
     ttsSpeed: props.ttsSpeed,  // TTS 语速（-500 到 500）
     onReady: () => {
       ready.value = true
+      if (gestureHint.value !== null) {
+        avatar.setGestureHint(gestureHint.value)
+      }
       syncBroadcastState()
     },
     onDataOut: (data) => {
@@ -507,8 +638,15 @@ function send() {
     loading.value = true
   }
   replyText.value = ''
-  avatar.sendTextViaSocket(text)
+  avatar.sendTextViaSocket(text, { gestureHint: gestureHint.value })
   scrollToBottom()
+}
+
+function applyGestureHint(hint) {
+  gestureHint.value = hint
+  if (avatar && typeof avatar.setGestureHint === 'function') {
+    avatar.setGestureHint(hint)
+  }
 }
 
 function syncBroadcastState() {
@@ -982,6 +1120,64 @@ onUnmounted(() => {
   padding: 12px 16px;
   border-top: 1px solid rgba(59, 123, 196, 0.2);
   background: rgba(10, 20, 35, 0.5);
+}
+
+.gesture-hint-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  width: 100%;
+  gap: 10px;
+  padding: 10px 16px;
+  border-top: 1px solid rgba(59, 123, 196, 0.12);
+  background: rgba(12, 26, 43, 0.78);
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 12px;
+}
+
+.gesture-hint-label,
+.gesture-hint-status {
+  flex-shrink: 0;
+}
+
+.gesture-hint-actions {
+  display: flex;
+  gap: 8px;
+  min-width: 0;
+}
+
+.gesture-hint-btn {
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid rgba(59, 123, 196, 0.35);
+  border-radius: 999px;
+  background: rgba(20, 35, 55, 0.9);
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.gesture-hint-btn:hover:not(:disabled) {
+  border-color: rgba(125, 211, 252, 0.7);
+  color: #fff;
+}
+
+.gesture-hint-btn.active {
+  border-color: rgba(125, 211, 252, 0.95);
+  background: rgba(37, 99, 235, 0.35);
+  color: #fff;
+}
+
+.gesture-hint-btn.clear.active {
+  border-color: rgba(248, 250, 252, 0.7);
+  background: rgba(71, 85, 105, 0.45);
+}
+
+.gesture-hint-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
 }
 
 .text-input {
