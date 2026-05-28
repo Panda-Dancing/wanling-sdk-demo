@@ -246,86 +246,6 @@ avatar.setGestureHint(null)
 - 需要临时指定一次左右手势时，在单次发送参数里传 `gestureHint`
 - 需要让后续语音、播报或外部对话持续使用同一侧手势时，先调用 `setGestureHint(hint)`
 
-#### 5.3 按住录音（Press-to-Record）
-
-按住录音是一种类微信"按住说话"的交互方式：按住按钮开始录音，ASR 实时转写，松开后取最终文本发送。与实时语音对话（`startVoiceStream`）不同，按住录音内部强制使用 `asr_only` 模式，仅做语音识别，不会自动触发 LLM/TTS/虚拟人播报。
-
-**SDK API：**
-
-```javascript
-// 开始按住录音
-await avatar.startPressRecord({
-  onInterimText: (text, isFinal) => {
-    // text: 当前识别到的文本
-    // isFinal: 当前这句是否已结束（服务端切句）
-    console.log('实时文本:', text, isFinal ? '(句末)' : '')
-  },
-  onStatusChange: (status) => {
-    // 状态变更: 'connecting' | 'streaming' | 'error' | 'stopped'
-    console.log('ASR 状态:', status)
-  },
-  onError: (err) => {
-    console.error('ASR 错误:', err)
-  }
-})
-
-// 停止按住录音，返回累积的最终识别文本
-const text = avatar.stopPressRecord()
-// text: 按住期间所有识别到的最终文本拼接结果
-if (text.trim()) {
-  avatar.sendTextViaSocket(text)  // 手动发送给虚拟人
-}
-
-// 查询是否正在进行按住录音
-avatar.isPressRecording  // boolean
-```
-
-**使用示例：**
-
-```javascript
-// 按钮按下 → 开始录音
-button.addEventListener('pointerdown', async () => {
-  recording.value = true
-  await avatar.startPressRecord({
-    onInterimText: (text) => {
-      displayText.value = text  // 实时展示识别文本
-    }
-  })
-})
-
-// 按钮松开 → 停止录音并发送
-button.addEventListener('pointerup', () => {
-  const text = avatar.stopPressRecord()
-  recording.value = false
-  if (text.trim()) {
-    avatar.sendTextViaSocket(text)
-  }
-})
-
-// 滑出取消（可选）
-button.addEventListener('pointerleave', () => {
-  if (recording.value) {
-    avatar.stopPressRecord()
-    recording.value = false
-  }
-})
-```
-
-**注意事项：**
-- 与 `startVoiceStream` 使用独立的 WebSocket 连接，两者互不干扰
-- 按住期间的所有 `is_final=true` 文本片段会自动累积，松开时拼接返回
-- 隐藏状态下调用 `startPressRecord` 会被忽略
-
-**Demo 集成 UI：**
-
-Demo 中在输入框上集成了按住录音功能：
-
-| 交互 | 说明 |
-|------|------|
-| **按住输入框** | 开始录音，输入框实时显示 ASR 识别文本，右侧出现录音指示灯 |
-| **松开输入框** | 停止录音，自动将最终文本填入输入框并发送 |
-| **滑出取消** | 手指/鼠标滑出输入框区域时取消本次录音 |
-
 #### 6. 隐藏 / 展示数字人
 
 SDK 现在提供会话级的展示开关。隐藏后：
@@ -666,7 +586,6 @@ Demo 中提供了两种入口：
 - **SDK 初始化**：创建 VideoAvatar 实例、连接 WebSocket
 - **文本对话**：发送消息、接收流式回复
 - **实时语音**：启动/停止 ASR 语音识别
-- **按住录音**：按住输入框录音，松开后发送 ASR 识别文本（Press-to-Record）
 - **展示控制**：隐藏/展示数字人并同步后端交互开关
 - **主动播报**：发起播报、取消当前播报、清空等待队列、展示播报队列状态
 - **外部对话**：开始外部对话、流式推送文本、取消外部对话（模拟用户自行调用 LLM）
@@ -710,12 +629,6 @@ Demo 中提供了两种入口：
 
 - 确保页面通过 HTTPS 或 localhost 访问（麦克风权限要求）
 - 检查浏览器是否授予了麦克风权限
-
-### 4. 按住录音无反应
-
-- 检查当前是否处于隐藏状态（隐藏状态下按住录音会被忽略）
-- 检查是否已开启实时语音对话（实时语音和按住录音互斥）
-- 检查浏览器控制台是否有 ASR 连接错误
 
 ## 扩展开发
 
