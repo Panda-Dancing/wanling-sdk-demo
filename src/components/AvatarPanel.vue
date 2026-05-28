@@ -108,18 +108,30 @@
             <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
           <div class="input-area">
-            <input
-              v-model="inputText"
-              type="text"
-              class="text-input"
-              :placeholder="isSleeping ? '虚拟人正在休息，说唤醒词唤醒...' : (voiceResponseMode === 'asr_only' ? 'asr_only 模式下文本对话已禁用' : '输入消息...')"
-              @keydown.enter="send"
-              :disabled="loading || !isVisible || voiceResponseMode === 'asr_only'"
-            />
-            <button 
-              class="send-btn" 
-              :disabled="loading || !inputText.trim() || !isVisible || voiceResponseMode === 'asr_only'" 
-              @click="send"
+            <div class="press-record-input" :class="{ recording: isPressRecording }">
+              <input
+                type="text"
+                class="text-input"
+                :class="{ 'is-recording': isPressRecording }"
+                :placeholder="isSleeping ? '虚拟人正在休息，说唤醒词唤醒...' : (voiceResponseMode === 'asr_only' ? 'asr_only 模式下文本对话已禁用' : '输入消息，或按住录音...')"
+                :value="isPressRecording ? inputText + pressRecordText : inputText"
+                @input="!isPressRecording && (inputText = $event.target.value)"
+                @keydown.enter="send()"
+                @pointerdown="onPointerDown"
+                @pointerup="onPointerUp"
+                @pointerleave="onPointerLeave"
+                :disabled="loading || !isVisible || voiceResponseMode === 'asr_only'"
+                :readonly="isPressRecording || undefined"
+              />
+              <span v-if="isPressRecording" class="record-indicator">
+                <span class="record-dot"></span>
+                <span class="record-wave"></span>
+              </span>
+            </div>
+            <button
+              class="send-btn"
+              :disabled="loading || !inputText.trim() || !isVisible || voiceResponseMode === 'asr_only'"
+              @click="send()"
             >
               发送
             </button>
@@ -404,6 +416,8 @@ const isVisible = ref(true)
 const isStreaming = ref(false)
 const streamStatus = ref('')
 const asrTempText = ref('')
+const isPressRecording = ref(false)
+const pressRecordText = ref('')
 const activeTab = ref('chat')
 const avatarState = ref('idle')
 
@@ -516,6 +530,7 @@ function connectSocket() {
 }
 
 function handleDataOut(data) {
+  console.log('[SDK Event]', data?.type, data?.payload ?? data)
   if (!data?.type) return
   switch (data.type) {
     case 'state_change':
@@ -625,21 +640,82 @@ function handleError(err) {
   scrollToBottom()
 }
 
-function send() {
-  const text = (inputText.value || '').trim()
+function send(textOverride) {
+  const raw = typeof textOverride === 'string' ? textOverride : inputText.value
+  const text = (raw || '').trim()
   if (voiceResponseMode.value === 'asr_only') return
-  // 沉睡状态下也允许发送消息（用于唤醒词唤醒虚拟人）
   if (!text || loading.value || !avatar || !isVisible.value) return
   messages.value.push({ role: 'user', text })
   inputText.value = ''
-  // 沉睡状态下不设置 loading，避免显示"思考中..."并禁用输入框
-  // 唤醒成功后服务端会正常返回回复，不是唤醒词则返回 message_ignored
   if (!isSleeping.value) {
     loading.value = true
   }
   replyText.value = ''
   avatar.sendTextViaSocket(text, { gestureHint: gestureHint.value })
   scrollToBottom()
+}
+
+let pressTimer = null
+const LONG_PRESS_MS = 400
+
+async function onPressStart() {
+  if (isPressRecording.value || isStreaming.value) return
+  if (!avatar || !isVisible.value) return
+  if (voiceResponseMode.value === 'asr_only') return
+  try {
+    pressRecordText.value = ''
+    await avatar.startPressRecord({
+      onInterimText: (text) => {
+        pressRecordText.value = text
+      }
+    })
+    isPressRecording.value = true
+  } catch (e) {
+    console.error('[AvatarPanel] 按住录音启动失败:', e)
+  }
+}
+
+function onPressEnd() {
+  if (!isPressRecording.value) return
+  const text = avatar.stopPressRecord()
+  isPressRecording.value = false
+  pressRecordText.value = ''
+  if (text.trim()) {
+    inputText.value = inputText.value ? inputText.value + text : text
+  }
+}
+
+function onPointerDown(e) {
+  if (isPressRecording.value || isStreaming.value) return
+  if (!avatar || !isVisible.value) return
+  if (voiceResponseMode.value === 'asr_only') return
+  pressTimer = setTimeout(() => {
+    pressTimer = null
+    onPressStart()
+  }, LONG_PRESS_MS)
+}
+
+function onPointerUp(e) {
+  if (pressTimer) {
+    // 短按：取消定时器，聚焦输入框进行文本输入
+    clearTimeout(pressTimer)
+    pressTimer = null
+    e.target.focus()
+  } else if (isPressRecording.value) {
+    // 长按松手：停止录音
+    onPressEnd()
+  }
+}
+
+function onPointerLeave(e) {
+  if (pressTimer) {
+    // 还没到长按阈值就离开了 → 取消
+    clearTimeout(pressTimer)
+    pressTimer = null
+  } else if (isPressRecording.value) {
+    // 录音中滑出 → 取消录音
+    onPressEnd()
+  }
 }
 
 function applyGestureHint(hint) {
@@ -1181,7 +1257,7 @@ onUnmounted(() => {
 }
 
 .text-input {
-  flex: 1;
+  width: 100%;
   height: 40px;
   padding: 0 14px;
   border: 1px solid rgba(59, 123, 196, 0.4);
@@ -1190,13 +1266,68 @@ onUnmounted(() => {
   color: #fff;
   font-size: 14px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .text-input:focus {
   border-color: rgba(102, 126, 234, 0.8);
 }
 
+.text-input.is-recording {
+  border-color: rgba(239, 68, 68, 0.7);
+  box-shadow: 0 0 12px rgba(239, 68, 68, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.text-input.is-recording::placeholder {
+  color: rgba(239, 68, 68, 0.7);
+}
+
+.press-record-input {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+}
+
+.record-indicator {
+  position: absolute;
+  right: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  pointer-events: none;
+}
+
+.record-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: record-pulse 1s ease-in-out infinite;
+}
+
+.record-wave {
+  width: 2px;
+  height: 16px;
+  background: rgba(239, 68, 68, 0.6);
+  border-radius: 1px;
+  animation: record-wave 0.6s ease-in-out infinite;
+}
+
+@keyframes record-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(1.3); }
+}
+
+@keyframes record-wave {
+  0%, 100% { height: 12px; opacity: 0.4; }
+  50% { height: 20px; opacity: 1; }
+}
+
 .send-btn {
+  flex-shrink: 0;
   height: 40px;
   padding: 0 20px;
   border: none;
