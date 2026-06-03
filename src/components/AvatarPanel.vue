@@ -530,7 +530,8 @@ function connectSocket() {
 }
 
 function handleDataOut(data) {
-  console.log('[SDK Event]', data?.type, data?.payload ?? data)
+  // SDK事件调试日志，需要时取消注释
+  // console.log('[SDK Event]', data?.type, data?.payload ?? data)
   if (!data?.type) return
   switch (data.type) {
     case 'state_change':
