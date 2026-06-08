@@ -8,6 +8,16 @@
     <header class="demo-header">
       <h1 class="demo-title">🎭 XHuman Video Avatar SDK Demo</h1>
       <div class="demo-controls">
+        <label class="log-level-label">
+          📋 日志:
+          <select class="log-level-select" v-model="logLevel" @change="onLogLevelChange">
+            <option value="silent">静默</option>
+            <option value="error">错误</option>
+            <option value="warn">警告</option>
+            <option value="info">信息</option>
+            <option value="debug">调试</option>
+          </select>
+        </label>
         <button
           class="control-btn"
           :class="{ active: avatarVisible }"
@@ -27,6 +37,7 @@
         ref="avatarRef"
         :api-base-url="apiBaseUrl"
         :page-data="pageData"
+        :log-level="logLevel"
         @reply="onReply"
         @data-out="onAvatarDataOut"
       />
@@ -47,6 +58,13 @@ const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
 const avatarRef = ref(null)
 const avatarVisible = ref(true)
 const pageData = ref({ scene: 'sdk_demo' })
+const logLevel = ref('error')
+
+function onLogLevelChange() {
+  if (avatarRef.value && typeof avatarRef.value.setLogLevel === 'function') {
+    avatarRef.value.setLogLevel(logLevel.value)
+  }
+}
 
 function onAvatarDataOut(data) {
   if (data?.type === 'visibility_change') {
@@ -106,6 +124,30 @@ onMounted(() => {
   display: flex;
   align-items: center;
   gap: 12px;
+}
+
+.log-level-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.75);
+}
+
+.log-level-select {
+  height: 30px;
+  padding: 0 8px;
+  border: 1px solid rgba(59, 123, 196, 0.4);
+  border-radius: 6px;
+  background: rgba(20, 35, 55, 0.8);
+  color: #fff;
+  font-size: 13px;
+  outline: none;
+  cursor: pointer;
+}
+
+.log-level-select:focus {
+  border-color: rgba(102, 126, 234, 0.8);
 }
 
 .control-btn {

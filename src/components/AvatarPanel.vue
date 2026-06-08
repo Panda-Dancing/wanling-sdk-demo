@@ -309,7 +309,7 @@
           <!-- 外部对话状态 -->
           <div class="broadcast-status-bar" v-if="externalChatActive">
             <span class="status-dot active"></span>
-            <span>外部对话进行中</span>
+            <span>{{ externalChatFinalSent ? '外部对话播报中' : '外部对话生成中' }}</span>
           </div>
 
           <!-- 外部对话文本输入 -->
@@ -396,7 +396,8 @@ const props = defineProps({
   apiBaseUrl: { type: String, default: '/' },
   pageData: { type: Object, default: () => ({}) },
   roleId: { type: String, default: 'xiao_ye' },
-  ttsSpeed: { type: Number, default: 0 }  // TTS 语速（-500 到 500）
+  ttsSpeed: { type: Number, default: 0 },  // TTS 语速（-500 到 500）
+  logLevel: { type: String, default: 'error' }  // 日志级别：silent|error|warn|info|debug
 })
 
 const emit = defineEmits(['reply', 'dataOut', 'streamState', 'stateChange'])
@@ -459,6 +460,7 @@ const gestureHint = ref(null)
 // 外部对话相关状态
 const externalChatText = ref('这是一段通过外部对话模式推送的文本。虚拟人会先进入思考状态，展示自然的思考动画，然后再进行语音播报。')
 const externalChatActive = ref(false)
+const externalChatFinalSent = ref(false)
 const externalChatStreamMode = ref(false)
 
 // SDK 实例
@@ -489,6 +491,7 @@ async function initAvatar() {
       useLLMStream: true,
       voiceResponseMode: voiceResponseMode.value,
       debug: false,
+      logLevel: props.logLevel,
     })
     await avatar.init()
     if (props.pageData && Object.keys(props.pageData).length > 0) {
@@ -539,7 +542,17 @@ function handleDataOut(data) {
       const newState = data?.payload?.new_state || ''
       if (newState && STATE_CONFIG[newState]) {
         avatarState.value = newState
+        if (externalChatActive.value && newState === 'idle') {
+          externalChatActive.value = false
+          externalChatFinalSent.value = false
+        }
         emit('stateChange', { oldState, newState })
+      }
+      break
+    case 'interrupt':
+      if (data?.payload?.reason === 'external_chat_cancel') {
+        externalChatActive.value = false
+        externalChatFinalSent.value = false
       }
       break
     case 'sleep_state_change':
@@ -771,6 +784,7 @@ async function startAndSendExternalChat() {
   // 1. 开始外部对话 → 虚拟人进入思考状态
   avatar.startExternalChat()
   externalChatActive.value = true
+  externalChatFinalSent.value = false
   lastBroadcastEvent.value = '✨ 外部对话已启动，虚拟人进入思考状态'
   
   if (externalChatStreamMode.value) {
@@ -787,6 +801,9 @@ async function startAndSendExternalChat() {
       }
       
       avatar.sendExternalChatChunk(chunk, isFinal)
+      if (isFinal) {
+        externalChatFinalSent.value = true
+      }
       lastBroadcastEvent.value = isFinal 
         ? `📤 流式推送完成 (共 ${sentences.length} 句)`
         : `📤 推送第 ${i + 1}/${sentences.length} 句: ${chunk.slice(0, 20)}...`
@@ -794,16 +811,16 @@ async function startAndSendExternalChat() {
   } else {
     // 一次性推送完整文本
     avatar.sendExternalChatChunk(text, true)
+    externalChatFinalSent.value = true
     lastBroadcastEvent.value = `📤 已推送完整文本 (${text.length} 字)`
   }
-  
-  externalChatActive.value = false
 }
 
 function cancelExternalChat() {
   if (!avatar) return
   avatar.cancelExternalChat()
   externalChatActive.value = false
+  externalChatFinalSent.value = false
   lastBroadcastEvent.value = '❌ 外部对话已取消'
 }
 
@@ -865,6 +882,12 @@ function scrollToBottom() {
   })
 }
 
+function setLogLevel(level) {
+  if (avatar && typeof avatar.setLogLevel === 'function') {
+    avatar.setLogLevel(level)
+  }
+}
+
 defineExpose({
   send,
   hideAvatar,
@@ -876,6 +899,7 @@ defineExpose({
   getBroadcastState: () => broadcastState.value,
   startAndSendExternalChat,
   cancelExternalChat,
+  setLogLevel,
 })
 
 watch(() => props.pageData, (data) => {

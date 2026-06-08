@@ -84,39 +84,9 @@ avatar = new VideoAvatar({
   apiBaseUrl: getBaseUrl(),    // 后端服务地址
   characterId: 'xiao_ma',      // 角色 ID， 目前支持xiao_ma, xiao_ye（交投项目avatar， 新模型和视频素材完善中，测试可先使用）
   container: containerRef.value, // 视频容器 DOM
-  useLLMStream: true,          // 启用流式输出
-  logLevel: 'error',           // 日志级别，默认 error，可选 silent/warn/info/debug
+  useLLMStream: true           // 启用流式输出
 })
 ```
-
-#### 2.1 日志级别控制（logLevel）
-
-SDK 支持通过 `logLevel` 参数控制控制台日志输出级别，默认值为 `'error'`（仅输出错误），避免生产环境日志刷屏：
-
-```javascript
-avatar = new VideoAvatar({
-  apiBaseUrl: getBaseUrl(),
-  characterId: 'xiao_ma',
-  container: containerRef.value,
-  logLevel: 'error',   // 默认值，只输出错误日志
-  // logLevel: 'warn',  // 输出警告 + 错误
-  // logLevel: 'info',  // 输出一般信息 + 警告 + 错误
-  // logLevel: 'debug', // 输出全部日志（含逐帧诊断，仅调试用）
-  // logLevel: 'silent',// 完全静默，不输出任何日志
-})
-```
-
-**日志级别说明：**
-
-| 级别 | 值 | 输出内容 |
-|------|------|---------|
-| `'silent'` | 0 | 无任何控制台输出 |
-| `'error'` **(默认)** | 1 | 仅错误信息（解码失败、连接异常等） |
-| `'warn'` | 2 | 错误 + 警告（数据丢弃、降级处理等） |
-| `'info'` | 3 | 错误 + 警告 + 一般操作信息 |
-| `'debug'` | 4 | 全部日志（含逐帧诊断 `[VideoSwitch]`、`[AvatarData]` 等） |
-
-> **提示**：当 `debug` 参数设为 `true` 时，`logLevel` 会自动提升为 `'debug'` 级别，方便开发调试。
 
 #### 3. 初始化并连接 WebSocket
 
