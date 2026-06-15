@@ -214,20 +214,18 @@ await avatar.startVoiceStream({
 
 #### 5.2 手势提示参数 `gestureHint`
 
-Demo 中新增了“手势提示”控制，对应 SDK/接口中的 `gestureHint` 参数，用于提示后端优先选择哪一侧的 `speak` 手势变体。
+Demo 中新增了“手势提示”控制，对应 SDK/接口中的 `gestureHint` 参数，用于提示后端下一次 `speak` 片段优先选择哪一侧的手势变体。
 
 | 取值 | Demo 按钮文案 | 说明 |
 |------|---------------|------|
-| `'left_hand'` | 左侧手势 | 优先命中带 `gesture_tags: [left_hand]` 的播报动作 |
-| `'right_hand'` | 右侧手势 | 优先命中带 `gesture_tags: [right_hand]` 的播报动作 |
-| `null` | 清除 | 清除当前提示，恢复后端默认选择 |
+| `'left_hand'` | 左手动作 | 优先命中带 `gesture_tags: [left_hand]` 的播报动作 |
+| `'right_hand'` | 右手动作 | 优先命中带 `gesture_tags: [right_hand]` 的播报动作 |
 
 **Demo 中的生效方式：**
 
-- 文本发送时，Demo 会按次透传：`avatar.sendTextViaSocket(text, { gestureHint: gestureHint.value })`
-- 建立连接后，以及用户切换“左侧 / 右侧 / 清除”按钮时，Demo 会同步调用：`avatar.setGestureHint(hint)`
-- 因此文本对话既支持“本次请求指定”，也会和当前会话级提示保持一致
-- 实时语音、主动播报、外部对话这类连续交互，默认沿用当前 `setGestureHint()` 设置
+- 点击“左手动作 / 右手动作”按钮时，Demo 会通过已有 Socket.IO 手势事件发送一次提示，不会设置 SDK 会话级持久状态。
+- 后端会把该 hint 作为一次性信号消费，只影响下一个 `speak` 视频片段/窗口。
+- 没有手势提示时，后端按 `speak` 配置里的 `probability` 做加权随机。
 
 ```javascript
 // 单次文本发送时指定
@@ -235,16 +233,13 @@ avatar.sendTextViaSocket('你好', {
   gestureHint: 'right_hand'
 })
 
-// 设置当前会话级手势提示
-avatar.setGestureHint('left_hand')
-avatar.setGestureHint('right_hand')
-avatar.setGestureHint(null)
+// Demo 按钮内部等价于直接发送一次 set_gesture_hint socket 事件
 ```
 
 **使用建议：**
 
-- 需要临时指定一次左右手势时，在单次发送参数里传 `gestureHint`
-- 需要让后续语音、播报或外部对话持续使用同一侧手势时，先调用 `setGestureHint(hint)`
+- 推荐在单次发送参数里传 `gestureHint`，让它只影响下一个 speak 片段。
+- 默认不传 `gestureHint`，后端按 `probability` 在所有 speak 变体中加权随机。
 
 #### 6. 隐藏 / 展示数字人
 

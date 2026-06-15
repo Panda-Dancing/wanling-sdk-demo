@@ -82,30 +82,19 @@
             <div class="gesture-hint-actions">
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'left_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('left_hand')"
+                @click="sendGestureHintOnce('left_hand')"
               >
-                左侧
+                左手动作
               </button>
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'right_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('right_hand')"
+                @click="sendGestureHintOnce('right_hand')"
               >
-                右侧
-              </button>
-              <button
-                class="gesture-hint-btn clear"
-                :class="{ active: gestureHint === null }"
-                :disabled="!ready || !isVisible"
-                @click="applyGestureHint(null)"
-              >
-                清除
+                右手动作
               </button>
             </div>
-            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
           <div class="input-area">
             <div class="press-record-input" :class="{ recording: isPressRecording }">
@@ -165,30 +154,19 @@
             <div class="gesture-hint-actions">
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'left_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('left_hand')"
+                @click="sendGestureHintOnce('left_hand')"
               >
-                左侧
+                左手动作
               </button>
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'right_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('right_hand')"
+                @click="sendGestureHintOnce('right_hand')"
               >
-                右侧
-              </button>
-              <button
-                class="gesture-hint-btn clear"
-                :class="{ active: gestureHint === null }"
-                :disabled="!ready || !isVisible"
-                @click="applyGestureHint(null)"
-              >
-                清除
+                右手动作
               </button>
             </div>
-            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
           <div class="voice-actions">
             <button
@@ -252,30 +230,19 @@
               <div class="gesture-hint-actions">
                 <button
                   class="gesture-hint-btn"
-                  :class="{ active: gestureHint === 'left_hand' }"
                   :disabled="!ready || !isVisible"
-                  @click="applyGestureHint('left_hand')"
+                  @click="sendGestureHintOnce('left_hand')"
                 >
-                  左侧
+                  左手动作
                 </button>
                 <button
                   class="gesture-hint-btn"
-                  :class="{ active: gestureHint === 'right_hand' }"
                   :disabled="!ready || !isVisible"
-                  @click="applyGestureHint('right_hand')"
+                  @click="sendGestureHintOnce('right_hand')"
                 >
-                  右侧
-                </button>
-                <button
-                  class="gesture-hint-btn clear"
-                  :class="{ active: gestureHint === null }"
-                  :disabled="!ready || !isVisible"
-                  @click="applyGestureHint(null)"
-                >
-                  清除
+                  右手动作
                 </button>
               </div>
-              <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
             </div>
 
             <div class="broadcast-buttons">
@@ -334,30 +301,19 @@
             <div class="gesture-hint-actions">
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'left_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('left_hand')"
+                @click="sendGestureHintOnce('left_hand')"
               >
-                左侧
+                左手动作
               </button>
               <button
                 class="gesture-hint-btn"
-                :class="{ active: gestureHint === 'right_hand' }"
                 :disabled="!ready || !isVisible"
-                @click="applyGestureHint('right_hand')"
+                @click="sendGestureHintOnce('right_hand')"
               >
-                右侧
-              </button>
-              <button
-                class="gesture-hint-btn clear"
-                :class="{ active: gestureHint === null }"
-                :disabled="!ready || !isVisible"
-                @click="applyGestureHint(null)"
-              >
-                清除
+                右手动作
               </button>
             </div>
-            <span class="gesture-hint-status">当前: {{ gestureHintText }}</span>
           </div>
 
           <!-- 外部对话操作按钮 -->
@@ -436,11 +392,6 @@ const STATE_CONFIG = {
 const stateDisplay = computed(() => {
   return STATE_CONFIG[avatarState.value] || STATE_CONFIG.idle
 })
-const gestureHintText = computed(() => {
-  if (gestureHint.value === 'left_hand') return '左侧'
-  if (gestureHint.value === 'right_hand') return '右侧'
-  return '无'
-})
 
 // 播报相关
 const broadcastText = ref('欢迎来到数字人主动播报演示')
@@ -455,7 +406,6 @@ const broadcastState = ref({
 })
 const lastBroadcastEvent = ref('暂无事件')
 const voiceResponseMode = ref('auto_reply')
-const gestureHint = ref(null)
 
 // 外部对话相关状态
 const externalChatText = ref('这是一段通过外部对话模式推送的文本。虚拟人会先进入思考状态，展示自然的思考动画，然后再进行语音播报。')
@@ -513,9 +463,6 @@ function connectSocket() {
     ttsSpeed: props.ttsSpeed,  // TTS 语速（-500 到 500）
     onReady: () => {
       ready.value = true
-      if (gestureHint.value !== null) {
-        avatar.setGestureHint(gestureHint.value)
-      }
       syncBroadcastState()
     },
     onDataOut: (data) => {
@@ -665,7 +612,7 @@ function send(textOverride) {
     loading.value = true
   }
   replyText.value = ''
-  avatar.sendTextViaSocket(text, { gestureHint: gestureHint.value })
+  avatar.sendTextViaSocket(text)
   scrollToBottom()
 }
 
@@ -732,11 +679,17 @@ function onPointerLeave(e) {
   }
 }
 
-function applyGestureHint(hint) {
-  gestureHint.value = hint
-  if (avatar && typeof avatar.setGestureHint === 'function') {
-    avatar.setGestureHint(hint)
+function sendGestureHintOnce(hint) {
+  const socketClient = avatar?._socket
+  const connected = socketClient?.socket?.connected === true
+  const label = hint === 'left_hand' ? '左手动作' : '右手动作'
+  if (!connected || typeof socketClient?.sendGestureHint !== 'function') {
+    lastBroadcastEvent.value = `⚠️ 手势提示未发送: Socket 未连接`
+    return
   }
+  socketClient.sendGestureHint(hint)
+  lastBroadcastEvent.value = `📤 已发送手势提示: ${label}`
+  console.info('[AvatarPanel] sendGestureHintOnce', { hint })
 }
 
 function syncBroadcastState() {
