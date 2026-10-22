@@ -53,8 +53,9 @@
 <script setup>
 import { ref, onMounted } from 'vue'
 import AvatarPanel from '@/components/AvatarPanel.vue'
+import { runtimeEnv } from '@/config/runtime'
 
-const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || ''
+const apiBaseUrl = runtimeEnv.apiBaseUrl
 const avatarRef = ref(null)
 const avatarVisible = ref(true)
 const pageData = ref({ scene: 'sdk_demo' })
@@ -98,7 +99,10 @@ onMounted(() => {
   display: flex;
   flex-direction: column;
   width: 100%;
-  height: 100%;
+  height: 100vh;
+  height: 100dvh;
+  min-height: 0;
+  overflow: hidden;
   background: linear-gradient(135deg, #0a1628 0%, #1a2a40 100%);
 }
 
@@ -204,5 +208,74 @@ onMounted(() => {
   background: rgba(10, 22, 40, 0.6);
   border-top: 1px solid rgba(59, 123, 196, 0.15);
   flex-shrink: 0;
+}
+
+@media (max-width: 768px), (max-width: 900px) and (max-height: 500px) {
+  .demo-header {
+    min-height: 56px;
+    padding:
+      max(10px, env(safe-area-inset-top))
+      max(12px, env(safe-area-inset-right))
+      10px
+      max(12px, env(safe-area-inset-left));
+    flex-wrap: wrap;
+    gap: 8px 12px;
+  }
+
+  .demo-title {
+    flex: 1 1 220px;
+    font-size: 15px;
+    line-height: 1.3;
+  }
+
+  .demo-controls {
+    flex: 1 1 auto;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+
+  .log-level-label {
+    font-size: 12px;
+  }
+
+  .log-level-select,
+  .control-btn {
+    min-height: 44px;
+  }
+
+  .status-badge {
+    display: none;
+  }
+
+  .demo-main {
+    align-items: stretch;
+    min-width: 0;
+    padding:
+      8px
+      max(8px, env(safe-area-inset-right))
+      max(8px, env(safe-area-inset-bottom))
+      max(8px, env(safe-area-inset-left));
+    overflow: hidden;
+  }
+
+  .demo-footer {
+    display: none;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  .demo-header {
+    min-height: 48px;
+    padding-top: max(4px, env(safe-area-inset-top));
+    padding-bottom: 4px;
+  }
+
+  .demo-title {
+    font-size: 13px;
+  }
+
+  .log-level-label {
+    display: none;
+  }
 }
 </style>

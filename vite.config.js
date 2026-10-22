@@ -3,6 +3,10 @@ import vue from '@vitejs/plugin-vue'
 import basicSsl from '@vitejs/plugin-basic-ssl'
 import { resolve } from 'path'
 
+function isAbsoluteHttpUrl(value) {
+  return value.startsWith('http://') || value.startsWith('https://')
+}
+
 /**
  * Vite 配置文件
  * 
@@ -15,17 +19,14 @@ import { resolve } from 'path'
 export default defineConfig(({ mode }) => {
   // 加载环境变量（只加载以 VITE_ 开头的变量）
   const env = loadEnv(mode, process.cwd(), 'VITE_')
-  const apiBaseUrl = env.VITE_API_BASE_URL
+  const apiBaseUrl = env.VITE_API_BASE_URL || '/api'
   const useLocalSdk = env.VITE_USE_LOCAL_SDK === 'true'
-  let apiTarget = apiBaseUrl
+  let apiTarget = env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000'
   let apiBasePath = ''
-  try {
+  if (isAbsoluteHttpUrl(apiBaseUrl)) {
     const u = new URL(apiBaseUrl)
     apiTarget = u.origin
     apiBasePath = u.pathname.replace(/\/$/, '')
-  } catch {
-    apiTarget = apiBaseUrl
-    apiBasePath = ''
   }
 
   // 构建 alias 配置

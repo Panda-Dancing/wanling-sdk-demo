@@ -6,7 +6,7 @@
  * - 挂载应用到 DOM
  * 
  * 接入 SDK 前的准备工作：
- * 1. 确保后端服务已启动（默认 http://localhost:8000）
+ * 1. 确保后端服务已启动（默认通过 /api 反向代理访问）
  * 2. 确保浏览器支持 WebCodecs API（Chrome 94+ / Edge 94+）
  */
 import { createApp } from 'vue'

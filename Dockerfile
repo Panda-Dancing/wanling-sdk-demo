@@ -40,8 +40,10 @@ RUN rm -rf /usr/share/nginx/html/*
 
 # 拷贝构建产物到 nginx 默认站点目录
 COPY --from=builder /workspace/frontend-sdk-demo/dist /usr/share/nginx/html
+COPY --from=builder /workspace/frontend-sdk-demo/docker/40-generate-env.sh /docker-entrypoint.d/40-generate-env.sh
+
+RUN chmod +x /docker-entrypoint.d/40-generate-env.sh
 
 EXPOSE 80
 
 CMD ["nginx", "-g", "daemon off;"]
-

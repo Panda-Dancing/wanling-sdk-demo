@@ -96,6 +96,9 @@
               </button>
             </div>
           </div>
+          <p v-if="pressRecordError" class="press-record-error" role="alert">
+            {{ pressRecordError }}
+          </p>
           <div class="input-area">
             <div class="press-record-input" :class="{ recording: isPressRecording }">
               <input
@@ -117,6 +120,18 @@
                 <span class="record-wave"></span>
               </span>
             </div>
+            <button
+              v-show="isMobileLayout"
+              class="mobile-record-btn"
+              :class="{ recording: isPressRecording }"
+              :disabled="!ready || loading || !isVisible || isStreaming || isPressFinalizing || voiceResponseMode === 'asr_only'"
+              @pointerdown="onMobileRecordPointerDown"
+              @pointerup="onMobileRecordPointerUp"
+              @pointercancel="onMobileRecordPointerCancel"
+              @contextmenu.prevent
+            >
+              {{ isPressFinalizing ? '识别中…' : (isPressRecording ? '松开完成' : '按住说话') }}
+            </button>
             <button
               class="send-btn"
               :disabled="loading || !inputText.trim() || !isVisible || voiceResponseMode === 'asr_only'"
@@ -172,7 +187,7 @@
             <button
               v-if="!isStreaming"
               class="voice-btn start"
-              :disabled="!ready || !isVisible"
+              :disabled="!ready || !isVisible || isPressRecording || isPressFinalizing"
               @click="startStream"
             >
               开始对话
@@ -189,6 +204,60 @@
             <p v-if="voiceResponseMode === 'auto_reply'">💡 语音对话时，ASR 最终文本会自动触发虚拟人回复</p>
             <p v-else>💡 当前模式只返回 ASR 文本，不触发 LLM、TTS 和虚拟人播报</p>
           </div>
+          <section class="asr-diagnostics-card" aria-live="polite">
+            <div class="diagnostics-heading">
+              <div>
+                <p class="diagnostics-kicker">移动端采集排查</p>
+                <h3>最近一次 ASR 诊断</h3>
+              </div>
+              <button
+                class="trace-copy-btn"
+                :disabled="!latestDiagnostics"
+                @click="copyDiagnosticsTrace"
+              >
+                {{ traceCopyStatus || '复制 trace' }}
+              </button>
+            </div>
+            <p v-if="!latestDiagnostics" class="diagnostics-empty">
+              完成一次按住录音或实时语音后，这里会显示采集摘要。
+            </p>
+            <template v-else>
+              <p class="trace-value">{{ latestDiagnostics.traceId }}</p>
+              <div class="diagnostics-grid">
+                <span>SDK <strong>{{ latestDiagnostics.sdkVersion || '—' }}</strong></span>
+                <span>结束 <strong>{{ latestDiagnostics.termination || '—' }}</strong></span>
+                <span>PCM 帧 <strong>{{ formatMetric(latestDiagnostics.pcm.frames) }}</strong></span>
+                <span>PCM 字节 <strong>{{ formatMetric(latestDiagnostics.pcm.bytes) }}</strong></span>
+                <span>RMS <strong>{{ formatMetric(latestDiagnostics.pcm.rms) }}</strong></span>
+                <span>Peak <strong>{{ formatMetric(latestDiagnostics.pcm.peak) }}</strong></span>
+                <span>WS 打开 <strong>{{ formatMs(latestDiagnostics.timingsMs.wsOpen) }}</strong></span>
+                <span>麦克风就绪 <strong>{{ formatMs(latestDiagnostics.timingsMs.micReady) }}</strong></span>
+                <span>首帧 PCM <strong>{{ formatMs(latestDiagnostics.timingsMs.firstPcm) }}</strong></span>
+                <span>结束 <strong>{{ formatMs(latestDiagnostics.timingsMs.ended) }}</strong></span>
+                <span>采样率 <strong>{{ formatHz(latestDiagnostics.track.sampleRate) }}</strong></span>
+                <span>声道 <strong>{{ formatMetric(latestDiagnostics.track.channelCount) }}</strong></span>
+                <span>回声消除 <strong>{{ formatSwitch(latestDiagnostics.track.echoCancellation) }}</strong></span>
+                <span>降噪 <strong>{{ formatSwitch(latestDiagnostics.track.noiseSuppression) }}</strong></span>
+                <span>自动增益 <strong>{{ formatSwitch(latestDiagnostics.track.autoGainControl) }}</strong></span>
+                <span>AudioContext <strong>{{ formatHz(latestDiagnostics.audioContext.sampleRate) }}</strong></span>
+                <span>采集引擎 <strong>{{ latestDiagnostics.local.captureEngine || '—' }}</strong></span>
+                <span>采集策略 <strong>{{ latestDiagnostics.local.capturePolicy || '—' }}</strong></span>
+                <span>约束回退 <strong>{{ latestDiagnostics.local.captureFallbackError || '无' }}</strong></span>
+                <span>终止来源 <strong>{{ latestDiagnostics.local.terminationSource || '—' }}</strong></span>
+                <span>音频回调 <strong>{{ formatMetric(latestDiagnostics.local.audioCallbacks.count) }}</strong></span>
+                <span>平均回调间隔 <strong>{{ formatMs(latestDiagnostics.local.audioCallbacks.averageIntervalMs) }}</strong></span>
+                <span>最大回调间隔 <strong>{{ formatMs(latestDiagnostics.local.audioCallbacks.maxIntervalMs) }}</strong></span>
+                <span>输入 RMS <strong>{{ formatMetric(latestDiagnostics.local.inputAudio.rms) }}</strong></span>
+                <span>输入 Peak <strong>{{ formatMetric(latestDiagnostics.local.inputAudio.peak) }}</strong></span>
+                <span>输入全零回调 <strong>{{ formatMetric(latestDiagnostics.local.inputAudio.zeroCallbacks) }}</strong></span>
+                <span>最长连续全零 <strong>{{ formatMetric(latestDiagnostics.local.inputAudio.longestZeroCallbacks) }}</strong></span>
+                <span>Track mute <strong>{{ formatMetric(latestDiagnostics.local.trackEvents.muteCount) }}</strong></span>
+                <span>Track unmute <strong>{{ formatMetric(latestDiagnostics.local.trackEvents.unmuteCount) }}</strong></span>
+                <span>首个识别 <strong>{{ formatMs(latestDiagnostics.local.timingsMs.firstInterim) }}</strong></span>
+                <span>麦克风释放 <strong>{{ formatMs(latestDiagnostics.local.timingsMs.micReleased) }}</strong></span>
+              </div>
+            </template>
+          </section>
         </div>
 
         <!-- 播报面板 -->
@@ -347,6 +416,10 @@
 <script setup>
 import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue'
 import { VideoAvatar } from '@wanlingsdk/avatar-sdk'
+import { runtimeEnv } from '@/config/runtime'
+import { summarizeAsrDiagnostics } from '@/utils/asrDiagnostics'
+import { createPressRecordSession } from '@/utils/pressRecordSession'
+import { canStartVoiceStream } from '@/utils/interactionGuards'
 
 const props = defineProps({
   apiBaseUrl: { type: String, default: '/' },
@@ -374,7 +447,12 @@ const isStreaming = ref(false)
 const streamStatus = ref('')
 const asrTempText = ref('')
 const isPressRecording = ref(false)
+const isPressFinalizing = ref(false)
 const pressRecordText = ref('')
+const pressRecordError = ref('')
+const isMobileLayout = ref(false)
+const latestDiagnostics = ref(null)
+const traceCopyStatus = ref('')
 const activeTab = ref('chat')
 const avatarState = ref('idle')
 
@@ -406,6 +484,10 @@ const broadcastState = ref({
 })
 const lastBroadcastEvent = ref('暂无事件')
 const voiceResponseMode = ref('auto_reply')
+const MOBILE_LAYOUT_QUERY = '(max-width: 768px), (max-width: 900px) and (max-height: 500px)'
+let mobileLayoutMedia = null
+let mobilePointerId = null
+let traceCopyTimer = null
 
 // 外部对话相关状态
 const externalChatText = ref('这是一段通过外部对话模式推送的文本。虚拟人会先进入思考状态，展示自然的思考动画，然后再进行语音播报。')
@@ -420,7 +502,7 @@ const sessionId = 'demo_' + Date.now() + '_' + Math.random().toString(36).slice(
 function getBaseUrl() {
   const v = String(props.apiBaseUrl || '').trim()
   if (v && v !== '/') return v
-  return import.meta.env.VITE_API_BASE_URL || v || ''
+  return runtimeEnv.apiBaseUrl || v || ''
 }
 
 function normalizeBaseUrl(baseUrl) {
@@ -516,6 +598,9 @@ function handleDataOut(data) {
       streamStatus.value = data?.payload?.status || ''
       emit('streamState', { streaming: isStreaming.value, status: data?.payload?.status })
       break
+    case 'asr_diagnostics':
+      latestDiagnostics.value = summarizeAsrDiagnostics(data?.payload)
+      break
     case 'asr_transcription':
       const asrText = data?.payload?.content || ''
       const asrIsFinal = data?.payload?.is_final
@@ -535,6 +620,7 @@ function handleDataOut(data) {
         asrTempText.value = ''
         isStreaming.value = false
         streamStatus.value = ''
+        onPressCancel()
       }
       break
     case 'broadcast_start':
@@ -619,35 +705,63 @@ function send(textOverride) {
 let pressTimer = null
 const LONG_PRESS_MS = 400
 
-async function onPressStart() {
-  if (isPressRecording.value || isStreaming.value) return
-  if (!avatar || !isVisible.value) return
-  if (voiceResponseMode.value === 'asr_only') return
-  try {
+const pressRecordSession = createPressRecordSession({
+  start: async () => {
+    if (!avatar) throw new Error('SDK 尚未初始化')
     pressRecordText.value = ''
     await avatar.startPressRecord({
       onInterimText: (text) => {
-        pressRecordText.value = text
-      }
+        pressRecordText.value = String(text || '')
+      },
+      onDiagnostics: (envelope) => {
+        latestDiagnostics.value = summarizeAsrDiagnostics(envelope)
+      },
+      onError: (error) => pressRecordSession.fail(error),
     })
-    isPressRecording.value = true
-  } catch (e) {
-    console.error('[AvatarPanel] 按住录音启动失败:', e)
-  }
+  },
+  finish: ({ source } = {}) => avatar.finishPressRecord({ terminationSource: source }),
+  cancel: ({ source } = {}) => avatar?.stopPressRecord?.({ terminationSource: source }),
+  onStateChange: (state) => {
+    isPressRecording.value = state === 'starting' || state === 'recording'
+    isPressFinalizing.value = state === 'finishing'
+    if (state === 'idle') pressRecordText.value = ''
+  },
+  onResult: (text) => {
+    const finalText = String(text || '').trim()
+    if (!finalText) return
+    inputText.value = inputText.value ? `${inputText.value}${finalText}` : finalText
+  },
+  onError: (error) => {
+    const message = error?.code === 'MIC_NOT_READY'
+      ? '未采集到音频，请重新按住录音'
+      : error?.code === 'MIC_BUFFER_OVERFLOW'
+        ? '网络连接过慢，录音缓存已满，请重试'
+        : '录音失败，请检查麦克风权限或网络后重试'
+    pressRecordError.value = message
+    streamStatus.value = message
+  },
+})
+
+function onPressStart() {
+  if (isPressRecording.value || isPressFinalizing.value || isStreaming.value) return Promise.resolve(false)
+  if (!avatar || !isVisible.value) return Promise.resolve(false)
+  if (voiceResponseMode.value === 'asr_only') return Promise.resolve(false)
+  pressRecordError.value = ''
+  return pressRecordSession.start()
 }
 
-function onPressEnd() {
-  if (!isPressRecording.value) return
-  const text = avatar.stopPressRecord()
-  isPressRecording.value = false
+function onPressEnd(source = 'pointerup') {
+  return pressRecordSession.finish({ source })
+}
+
+function onPressCancel(source = 'pointercancel') {
   pressRecordText.value = ''
-  if (text.trim()) {
-    inputText.value = inputText.value ? inputText.value + text : text
-  }
+  return pressRecordSession.cancel({ source })
 }
 
 function onPointerDown(e) {
-  if (isPressRecording.value || isStreaming.value) return
+  if (isMobileLayout.value) return
+  if (isPressRecording.value || isPressFinalizing.value || isStreaming.value) return
   if (!avatar || !isVisible.value) return
   if (voiceResponseMode.value === 'asr_only') return
   pressTimer = setTimeout(() => {
@@ -664,7 +778,7 @@ function onPointerUp(e) {
     e.target.focus()
   } else if (isPressRecording.value) {
     // 长按松手：停止录音
-    onPressEnd()
+    onPressEnd('desktop-pointerup')
   }
 }
 
@@ -675,8 +789,95 @@ function onPointerLeave(e) {
     pressTimer = null
   } else if (isPressRecording.value) {
     // 录音中滑出 → 取消录音
-    onPressEnd()
+    onPressCancel('desktop-pointerleave')
   }
+}
+
+function onMobileRecordPointerDown(event) {
+  if (!isMobileLayout.value || event.button > 0) return
+  event.preventDefault()
+  mobilePointerId = event.pointerId
+  try {
+    event.currentTarget?.setPointerCapture?.(event.pointerId)
+  } catch {
+    // 部分 Android WebView 不支持 pointer capture，window 事件会兜底。
+  }
+  onPressStart()
+}
+
+function onMobileRecordPointerUp(event, source = 'pointerup') {
+  if (mobilePointerId !== null && event.pointerId !== mobilePointerId) return
+  event.preventDefault()
+  onPressEnd(source)
+  try {
+    event.currentTarget?.releasePointerCapture?.(event.pointerId)
+  } catch {
+    // window pointerup/pointercancel 负责兜底。
+  }
+  mobilePointerId = null
+}
+
+function onMobileRecordPointerCancel(event, source = 'pointercancel') {
+  if (mobilePointerId !== null && event.pointerId !== mobilePointerId) return
+  event?.preventDefault?.()
+  onPressCancel(source)
+  mobilePointerId = null
+}
+
+function handleWindowPointerUp(event) {
+  if (mobilePointerId !== null) onMobileRecordPointerUp(event, 'window-pointerup')
+}
+
+function handleWindowPointerCancel(event) {
+  if (mobilePointerId !== null) onMobileRecordPointerCancel(event, 'window-pointercancel')
+}
+
+function handlePageVisibility() {
+  if (!document.hidden) return
+  if (pressTimer) {
+    clearTimeout(pressTimer)
+    pressTimer = null
+  }
+  mobilePointerId = null
+  onPressCancel('page-hidden')
+}
+
+function updateMobileLayout(event) {
+  isMobileLayout.value = event.matches
+  if (event.matches || pressRecordSession.state === 'idle') return
+  mobilePointerId = null
+  onPressCancel('layout-change')
+}
+
+function formatMetric(value) {
+  return value === null || value === undefined ? '—' : String(value)
+}
+
+function formatMs(value) {
+  return value === null || value === undefined ? '—' : `${value} ms`
+}
+
+function formatHz(value) {
+  return value === null || value === undefined ? '—' : `${value} Hz`
+}
+
+function formatSwitch(value) {
+  return value === null || value === undefined ? '—' : (value ? '开启' : '关闭')
+}
+
+async function copyDiagnosticsTrace() {
+  const traceId = latestDiagnostics.value?.traceId
+  if (!traceId) return
+  try {
+    await navigator.clipboard.writeText(traceId)
+    traceCopyStatus.value = '已复制'
+  } catch {
+    traceCopyStatus.value = '复制失败'
+  }
+  clearTimeout(traceCopyTimer)
+  traceCopyTimer = setTimeout(() => {
+    traceCopyStatus.value = ''
+  }, 1600)
 }
 
 function sendGestureHintOnce(hint) {
@@ -778,7 +979,13 @@ function cancelExternalChat() {
 }
 
 async function startStream() {
-  if (!avatar || !isVisible.value) return
+  if (!canStartVoiceStream({
+    hasAvatar: Boolean(avatar),
+    isVisible: isVisible.value,
+    isPressRecording: isPressRecording.value,
+    isPressFinalizing: isPressFinalizing.value,
+    isStreaming: isStreaming.value,
+  })) return
   try {
     asrTempText.value = ''
     await avatar.startVoiceStream({
@@ -873,10 +1080,24 @@ watch(voiceResponseMode, (mode) => {
 })
 
 onMounted(() => {
+  mobileLayoutMedia = window.matchMedia(MOBILE_LAYOUT_QUERY)
+  updateMobileLayout(mobileLayoutMedia)
+  mobileLayoutMedia.addEventListener?.('change', updateMobileLayout)
+  window.addEventListener('pointerup', handleWindowPointerUp)
+  window.addEventListener('pointercancel', handleWindowPointerCancel)
+  document.addEventListener('visibilitychange', handlePageVisibility)
   initAvatar()
 })
 
 onUnmounted(() => {
+  if (pressTimer) clearTimeout(pressTimer)
+  clearTimeout(traceCopyTimer)
+  mobilePointerId = null
+  onPressCancel()
+  mobileLayoutMedia?.removeEventListener?.('change', updateMobileLayout)
+  window.removeEventListener('pointerup', handleWindowPointerUp)
+  window.removeEventListener('pointercancel', handleWindowPointerCancel)
+  document.removeEventListener('visibilitychange', handlePageVisibility)
   if (avatar && typeof avatar.stopVoiceStream === 'function') {
     avatar.stopVoiceStream()
   }
@@ -1176,6 +1397,16 @@ onUnmounted(() => {
   background: rgba(10, 20, 35, 0.5);
 }
 
+.press-record-error {
+  margin: 0;
+  padding: 8px 16px;
+  border-top: 1px solid rgba(248, 113, 113, 0.2);
+  background: rgba(127, 29, 29, 0.24);
+  color: #fecaca;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
 .gesture-hint-bar {
   display: flex;
   align-items: center;
@@ -1328,6 +1559,33 @@ onUnmounted(() => {
   cursor: not-allowed;
 }
 
+.mobile-record-btn {
+  display: none;
+  flex-shrink: 0;
+  height: 44px;
+  padding: 0 16px;
+  border: 1px solid rgba(96, 165, 250, 0.65);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(37, 99, 235, 0.95), rgba(79, 70, 229, 0.95));
+  color: #fff;
+  font-size: 14px;
+  font-weight: 600;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+}
+
+.mobile-record-btn.recording {
+  border-color: rgba(248, 113, 113, 0.9);
+  background: linear-gradient(135deg, #ef4444, #be123c);
+  box-shadow: 0 0 0 4px rgba(239, 68, 68, 0.14);
+}
+
+.mobile-record-btn:disabled {
+  opacity: 0.45;
+}
+
 /* 语音面板 */
 .voice-panel {
   display: flex;
@@ -1435,6 +1693,93 @@ onUnmounted(() => {
 
 .voice-note p {
   margin: 0;
+}
+
+.asr-diagnostics-card {
+  width: 100%;
+  max-width: 520px;
+  padding: 16px;
+  border: 1px solid rgba(96, 165, 250, 0.24);
+  border-radius: 14px;
+  background: linear-gradient(145deg, rgba(15, 36, 60, 0.96), rgba(12, 27, 48, 0.96));
+  color: rgba(255, 255, 255, 0.86);
+}
+
+.diagnostics-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.diagnostics-heading h3 {
+  margin: 2px 0 0;
+  font-size: 15px;
+  color: #f8fafc;
+}
+
+.diagnostics-kicker {
+  margin: 0;
+  color: #7dd3fc;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+}
+
+.trace-copy-btn {
+  min-height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(125, 211, 252, 0.35);
+  border-radius: 9px;
+  background: rgba(14, 116, 144, 0.22);
+  color: #bae6fd;
+  cursor: pointer;
+}
+
+.trace-copy-btn:disabled {
+  opacity: 0.42;
+  cursor: not-allowed;
+}
+
+.diagnostics-empty {
+  margin: 14px 0 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.trace-value {
+  margin: 12px 0;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(2, 8, 23, 0.48);
+  color: #93c5fd;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.diagnostics-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.diagnostics-grid span {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+  color: rgba(255, 255, 255, 0.48);
+  font-size: 11px;
+}
+
+.diagnostics-grid strong {
+  overflow: hidden;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 12px;
+  font-weight: 550;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* 播报面板 */
@@ -1609,5 +1954,162 @@ onUnmounted(() => {
 /* 隐藏状态 - 完全不可见 */
 .avatar-panel.hidden-state .avatar-section {
   visibility: hidden;
+}
+
+@media (max-width: 768px), (max-width: 900px) and (max-height: 500px) {
+  .avatar-panel {
+    width: 100%;
+    max-width: 100%;
+    height: 100%;
+    max-height: 100%;
+    flex-direction: column;
+    border-radius: 12px;
+  }
+
+  .avatar-section {
+    width: 100%;
+    height: clamp(150px, 32dvh, 260px);
+    border-right: 0;
+    border-bottom: 1px solid rgba(59, 123, 196, 0.2);
+  }
+
+  .avatar-status-bar {
+    min-height: 36px;
+    padding: 6px 10px;
+  }
+
+  .function-section {
+    flex: 1;
+    width: 100%;
+    min-height: 0;
+  }
+
+  .tab-btn {
+    min-height: 44px;
+    padding: 10px 8px;
+  }
+
+  .tab-content,
+  .panel {
+    min-width: 0;
+  }
+
+  .chat-panel .message-list {
+    padding: 12px;
+  }
+
+  .gesture-hint-bar {
+    padding: 8px 12px;
+  }
+
+  .gesture-hint-btn {
+    min-height: 36px;
+  }
+
+  .input-area {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 10px 12px max(10px, env(safe-area-inset-bottom));
+  }
+
+  .press-record-input {
+    flex: 1 1 calc(100% - 72px);
+  }
+
+  .text-input {
+    height: 44px;
+    font-size: 16px;
+  }
+
+  .mobile-record-btn {
+    display: inline-flex;
+    flex: 1 1 120px;
+    align-items: center;
+    justify-content: center;
+  }
+
+  .send-btn {
+    height: 44px;
+    padding: 0 18px;
+  }
+
+  .voice-panel {
+    justify-content: flex-start;
+    gap: 14px;
+    padding: 16px 12px max(16px, env(safe-area-inset-bottom));
+    overflow-y: auto;
+  }
+
+  .voice-icon {
+    margin-bottom: 8px;
+    font-size: 42px;
+  }
+
+  .voice-mode-card,
+  .asr-diagnostics-card {
+    max-width: none;
+  }
+
+  .voice-btn {
+    min-height: 48px;
+  }
+
+  .diagnostics-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trace-copy-btn {
+    min-height: 44px;
+  }
+
+  .broadcast-panel {
+    padding: 12px;
+  }
+
+  .broadcast-buttons {
+    flex-wrap: wrap;
+  }
+
+  .bc-btn {
+    min-width: 100px;
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 900px) and (max-height: 500px) {
+  .avatar-section {
+    height: 116px;
+  }
+
+  .avatar-status-bar {
+    position: absolute;
+    z-index: 2;
+    right: 8px;
+    top: 8px;
+    border-radius: 999px;
+  }
+
+  .input-area {
+    flex-wrap: nowrap;
+    padding-top: 6px;
+    padding-bottom: 6px;
+  }
+
+  .press-record-input {
+    flex: 1 1 auto;
+  }
+
+  .mobile-record-btn {
+    flex: 0 0 132px;
+  }
+
+  .send-btn {
+    padding: 0 16px;
+  }
+
+  .gesture-hint-bar {
+    padding-top: 5px;
+    padding-bottom: 5px;
+  }
 }
 </style>
